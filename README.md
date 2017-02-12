@@ -2,7 +2,7 @@
 
 ![Earth](/screenshot.png)
 
-This project demonstrate the 2D rendering technique described at
+This project demonstrate the 2D planet rendering technique described at
 https://habrahabr.ru/post/248381/ (Russian).
 
 I google translated the article to English and followed the instructions
