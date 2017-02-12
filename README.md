@@ -1,4 +1,4 @@
-# Love2D renderplanet demo #
+# [love2d](http://love2d.org) renderplanet demo #
 
 ![Earth](/screenshot.png)
 
