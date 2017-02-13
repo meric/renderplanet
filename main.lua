@@ -120,13 +120,12 @@ Planet = setmetatable({}, {
       self.clouds_shader:send("rotate_angle", self.rotate_angle)
     end
     self.atmosphere = love.graphics.newCanvas(
-      height * 2 + 4 * self.atmosphere_size,
-      height * 2 + 4 * self.atmosphere_size)
+      height + 2 * self.atmosphere_size,
+      height + 2 * self.atmosphere_size)
     love.graphics.setCanvas(self.atmosphere)
     love.graphics.clear()
     love.graphics.setBlendMode("alpha")
     love.graphics.push()
-    love.graphics.scale(2)
     love.graphics.translate(self.atmosphere_size, self.atmosphere_size)
     self:prerender_atmosphere()
     love.graphics.pop()
@@ -198,12 +197,10 @@ function Planet:prerender_atmosphere()
 end
 
 function Planet:render_atmosphere()
-  love.graphics.scale(0.5)
   love.graphics.setColor(255, 255, 255, 255)
   love.graphics.setBlendMode("alpha", "premultiplied")
-  love.graphics.draw(self.atmosphere, -self.atmosphere_size*2, -self.atmosphere_size*2)
+  love.graphics.draw(self.atmosphere, -self.atmosphere_size, -self.atmosphere_size)
   love.graphics.setBlendMode("alpha")
-  love.graphics.pop()
 end
 
 function Planet:draw()
@@ -213,6 +210,7 @@ function Planet:draw()
   self:render_planet()
   self:render_clouds()
   self:render_atmosphere()
+  love.graphics.pop()
 end
 
 local planets = {}
