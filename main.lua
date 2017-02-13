@@ -1,4 +1,4 @@
-local time, earth
+local time
 
 local template_texture = love.graphics.newImage("texture_template.png")
 local shader_source = [[
@@ -14,10 +14,19 @@ mat2 rotate2d(float _angle) {
                 sin(_angle), cos(_angle));
 }
 
+bool has_rotate_matrix = false;
+
+mat2 rotate_planet_matrix;
+mat2 rotate_light_matrix;
 
 vec4 effect( vec4 color, Image vectors, vec2 vectors_coords, vec2 screen_coords ){
   // Rotate planet
-  vec2 rotated_coords = rotate2d(rotate_angle) * (vectors_coords-vec2(0.5));
+  if (!has_rotate_matrix) {
+    rotate_planet_matrix = rotate2d(rotate_angle);
+    rotate_light_matrix = rotate2d(light_angle + M_PI/4);
+    has_rotate_matrix = true;
+  }
+  vec2 rotated_coords = rotate_planet_matrix * (vectors_coords-vec2(0.5));
   rotated_coords += vec2(0.5);
 
   vec4 vector = Texel(vectors, rotated_coords );
@@ -41,7 +50,7 @@ vec4 effect( vec4 color, Image vectors, vec2 vectors_coords, vec2 screen_coords 
 
   shadow_coords -= vec2(0.5);
   light_coords -= vec2(0.5);
-  light_coords = rotate2d(light_angle + M_PI/4) * light_coords;
+  light_coords = rotate_light_matrix * light_coords;
   number shadow = 0;
   shadow = 1-pow(distance(light_coords, shadow_coords)*0.9, 3);
   if (shadow < 0.05) {
@@ -59,7 +68,10 @@ local mesh_shader = love.graphics.newShader
 
 Planet = setmetatable({}, {
   __call = function(_, options)
+    local height = template_texture:getHeight()
     local self =  setmetatable({
+      x = options.x or 0,
+      y = options.y or 0,
       planet_texture = options.planet_texture,
       clouds_texture = options.clouds_texture,
       night_texture = options.night_texture,
@@ -68,9 +80,10 @@ Planet = setmetatable({}, {
       speed = options.speed or 0.1,
       rotate_angle = options.rotate_angle or 0,
       light_angle = options.light_angle or 0,
-      size = template_texture:getHeight()/2,
+      size = height/2,
+      radius = options.radius or height/2,
       atmosphere_color = options.atmosphere_color or {160, 160, 165},
-      atmosphere_size = options.atmosphere_size or 24
+      atmosphere_size = options.atmosphere_size or 24,
     }, Planet)
     local planet_shader_source
     if self.night_texture then
@@ -106,7 +119,18 @@ Planet = setmetatable({}, {
       self.clouds_shader:send("light_angle", self.light_angle)
       self.clouds_shader:send("rotate_angle", self.rotate_angle)
     end
-
+    self.atmosphere = love.graphics.newCanvas(
+      height * 2 + 4 * self.atmosphere_size,
+      height * 2 + 4 * self.atmosphere_size)
+    love.graphics.setCanvas(self.atmosphere)
+    love.graphics.clear()
+    love.graphics.setBlendMode("alpha")
+    love.graphics.push()
+    love.graphics.scale(2)
+    love.graphics.translate(self.atmosphere_size, self.atmosphere_size)
+    self:prerender_atmosphere()
+    love.graphics.pop()
+    love.graphics.setCanvas()
     return self
   end
 })
@@ -151,7 +175,7 @@ function Planet:set_atmosphere_color(a)
     self.atmosphere_color[3], a or 255)
 end
 
-function Planet:render_atmosphere()
+function Planet:prerender_atmosphere()
   love.graphics.setLineStyle("smooth")
   love.graphics.setLineWidth(16)
   local n = self.atmosphere_size
@@ -173,37 +197,66 @@ function Planet:render_atmosphere()
   self:render_arc(tail + size - tau, -(tail + size))
 end
 
+function Planet:render_atmosphere()
+  love.graphics.scale(0.5)
+  love.graphics.setColor(255, 255, 255, 255)
+  love.graphics.setBlendMode("alpha", "premultiplied")
+  love.graphics.draw(self.atmosphere, -self.atmosphere_size*2, -self.atmosphere_size*2)
+  love.graphics.setBlendMode("alpha")
+  love.graphics.pop()
+end
+
 function Planet:draw()
+  love.graphics.push()
+  love.graphics.translate(self.x - self.radius, self.y - self.radius)
+  love.graphics.scale(self.radius/self.size)
   self:render_planet()
   self:render_clouds()
   self:render_atmosphere()
 end
 
+local planets = {}
+
 function love.load()
   time = 0
-  earth = Planet{
-    speed = 0.1,
-    planet_texture = love.graphics.newImage("texture_earth.png"),
-    clouds_texture = love.graphics.newImage("texture_clouds.png"),
-    night_texture = love.graphics.newImage("texture_night.png"),
-    light_angle = math.pi-math.pi/16,
-    rotate_angle = -math.pi/16,
-    atmosphere_color = {160, 160, 190},
-    atmosphere_size = 36
-  }
+  love.window.setMode( 1024, 768, {highdpi=true, vsync=false})
+  local texture_earth = love.graphics.newImage("texture_earth.png")
+  local texture_clouds = love.graphics.newImage("texture_clouds.png")
+  local texture_night = love.graphics.newImage("texture_night.png")
+  for i=1, 4 do
+    for j=1, 3 do
+      local x, y = 128 + (i-1) * 256, 128 + (j-1) * 256
+      planets[#planets+1] = Planet{
+        x = x,
+        y = y,
+        radius = 128,
+        speed = 0.1,
+        planet_texture = texture_earth,
+        clouds_texture = texture_clouds,
+        night_texture = texture_night,
+        light_angle = math.pi-math.pi/16,
+        rotate_angle = -math.pi/16,
+        atmosphere_color = {160, 160, 190},
+        atmosphere_size = 36
+      }
+    end
+  end
 end
 
 function love.update(dt)
   time = time + dt
-  earth:update(dt)
+  for _, planet in ipairs(planets) do
+    planet:update(dt)
+  end
 end
 
 function love.draw()
-  love.graphics.setColor(0, 0, 0)
-  love.graphics.rectangle("fill", 0, 0, 800,600)
   love.graphics.push()
-  love.graphics.translate(10, 10)
-  love.graphics.scale(0.5)
-  earth:draw()
+  love.graphics.scale(love.window.getPixelScale())
+  for _, planet in ipairs(planets) do
+    planet:draw()
+  end
+  love.graphics.setColor(255, 255, 255)
+  love.graphics.print("Current FPS: "..tostring(love.timer.getFPS( )), 10, 10)
   love.graphics.pop()
 end
