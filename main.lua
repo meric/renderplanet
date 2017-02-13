@@ -79,6 +79,7 @@ Planet = setmetatable({}, {
       time = 0,
       speed = options.speed or 0.1,
       rotate_angle = options.rotate_angle or 0,
+      rotate_retrograde = options.retrograde or false,
       light_angle = options.light_angle or 0,
       size = height/2,
       radius = options.radius or height/2,
@@ -137,7 +138,13 @@ Planet = setmetatable({}, {
 Planet.__index = Planet
 
 function Planet:update(dt)
-  self.time = (self.time + dt * self.speed) % 2
+  if self.rotate_retrograde then
+    -- Rotate opposite direction as Earth
+    self.time = (self.time + dt * self.speed) % 2
+  else
+    -- Rotate same direction as Earth
+    self.time = (self.time - dt * self.speed) % 2
+  end
   self.planet_shader:send("time", self.time)
   if self.clouds_shader then
     self.clouds_shader:send("time", self.time)
@@ -232,7 +239,7 @@ function love.load()
         planet_texture = texture_earth,
         clouds_texture = texture_clouds,
         night_texture = texture_night,
-        light_angle = math.pi-math.pi/16,
+        light_angle = math.pi+math.pi/16,
         rotate_angle = -math.pi/16,
         atmosphere_color = {160, 160, 190},
         atmosphere_size = 36
